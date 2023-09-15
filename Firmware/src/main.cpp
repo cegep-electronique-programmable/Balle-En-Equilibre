@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <ESP32Servo.h>
 #include <SharpIR.h>
+#include "Adafruit_VL53L0X.h"
 
 // Données de calibration du servo
 #define PIN_SERVO 33
@@ -15,6 +16,9 @@ Servo myservo;
 
 SharpIR sensor( SharpIR::GP2Y0A21YK0F, PIN_CAPTEUR_1);
 
+// Données de calibration du capteur 2
+Adafruit_VL53L0X lox = Adafruit_VL53L0X();
+
 
 void moveServo(int angle) {
   angle = angle > ANGLE_MAX ? ANGLE_MAX : angle;
@@ -27,6 +31,13 @@ void setup() {
   ESP32PWM::allocateTimer(0);
   pinMode(PIN_SERVO, OUTPUT);
   pinMode(PIN_CAPTEUR_1, INPUT);
+
+  while (!lox.begin()) {
+    Serial.println(F("Failed to boot VL53L0X"));
+    delay(1000);
+  }
+
+  lox.startRangeContinuous();
 }
 
 void loop() {
@@ -39,8 +50,10 @@ void loop() {
   delay(1000);
   
   while(1) {
-    int val = sensor.getDistance();
-    Serial.println(val); 
+    if (lox.isRangeComplete()) {
+    Serial.print("Distance in mm: ");
+    Serial.println(lox.readRange());
+  } 
     delay(100);
   }
 }
