@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "Balle-En-Equilibre",
+			"path": "Firmware/Balle-En-Equilibre"
+		}
+	],
+	"settings": {}
+}
