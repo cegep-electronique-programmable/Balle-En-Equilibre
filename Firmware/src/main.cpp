@@ -3,6 +3,14 @@
 #include <SharpIR.h>
 #include "Adafruit_VL53L0X.h"
 
+// Données du régulateur PID
+#define KP 0.1
+#define KI 0.01
+#define KD 0.025
+#define DT 0.05
+#define POSITION_CENTRALE 280
+unsigned long previousMillisControlLoop = 0;
+
 // Données de calibration du servo
 #define PIN_SERVO 33
 #define ANGLE_MIN -60
@@ -48,13 +56,90 @@ void loop() {
 
   moveServo(0);
   delay(1000);
-  
+
+  float position_balle = 0;
+  float x[2] = {0, 0}; // raw position
+  float y[2] = {0, 0}; // filtered position
+
+  float consigne = POSITION_CENTRALE;
+  float dt = DT;
+  float erreur = 0;
+  float erreur_somme = 0;
+  float erreur_delta = 0;
+  float erreur_precedente = 0;
+  float position_moteur = 0;
+
   while(1) {
-    if (lox.isRangeComplete()) {
-    Serial.print("Distance in mm: ");
-    Serial.println(lox.readRange());
+    
+
+    /*
+    if (nouvelle_position_balle < 1000) {
+      position_balle = 0.25 * nouvelle_position_balle + 0.75 * position_balle;
+    }
+    */
+
+
+    // Boucle de controle de la vitesse horizontale
+    unsigned long currentMillis = millis();
+
+    if (currentMillis - previousMillisControlLoop >= dt*1000)
+    {
+      previousMillisControlLoop = currentMillis;
+
+      while (!lox.isRangeComplete());
+      x[1] = lox.readRange();
+      Serial.print(x[1]);
+      Serial.print(", ");
+      y[1] = 0.969 * y[0] + 0.0155 * x[1] + 0.0155 * x[0]; 
+
+      position_balle = y[1];
+      Serial.print(position_balle);
+      Serial.print(", ");
+
+      x[0] = x[1];
+      y[0] = y[1];
+    
+      erreur = consigne - position_balle;
+      Serial.print(erreur);
+      Serial.print(", ");
+
+      // anti windup
+      if (position_moteur <= ANGLE_MAX && position_moteur >= ANGLE_MIN) {
+        erreur_somme = erreur_somme + erreur*dt;
+      }
+
+      erreur_delta = (erreur - erreur_precedente) / dt;
+      /*
+      if (abs(erreur_delta) < 100) {
+        erreur_delta = 0;
+      }
+      */
+
+      float P = KP * erreur;
+      float I = KI * erreur_somme;
+      float D = KD * erreur_delta;
+      
+      Serial.print(P);
+      Serial.print(", ");
+      
+      Serial.print(I);
+      Serial.print(", ");
+      
+      Serial.print(D);
+      Serial.print(", ");
+
+      position_moteur = P + I + D;
+
+      erreur_precedente = erreur;
+
+      // Saturation
+      position_moteur = position_moteur > ANGLE_MAX ? ANGLE_MAX : position_moteur;
+      position_moteur = position_moteur < ANGLE_MIN ? ANGLE_MIN : position_moteur;
+      Serial.println(position_moteur);
+
+      moveServo(position_moteur);
+    }
   } 
-    delay(100);
-  }
+    
 }
 
