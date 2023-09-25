@@ -6,15 +6,15 @@
 // Données du régulateur PID
 #define KP 0.1
 #define KI 0.01
-#define KD 0.025
-#define DT 0.05
+#define KD 0.00
+#define DT 0.01
 #define POSITION_CENTRALE 280
 unsigned long previousMillisControlLoop = 0;
 
 // Données de calibration du servo
 #define PIN_SERVO 33
-#define ANGLE_MIN -60
-#define ANGLE_MAX 60
+#define ANGLE_MIN -50
+#define ANGLE_MAX 50
 #define ANGLE_OFFSET 90
 
 Servo myservo;
@@ -86,19 +86,32 @@ void loop() {
     {
       previousMillisControlLoop = currentMillis;
 
-      while (!lox.isRangeComplete());
-      x[1] = lox.readRange();
+      // Lecture de la position de la balle
+      x[1] = 1000;
+      while (x[1] > 900) { // On recommence la lecture si la valeur est trop grande
+        while (!lox.isRangeComplete());
+        x[1] = lox.readRange();
+      }
+      
       Serial.print(x[1]);
       Serial.print(", ");
-      y[1] = 0.969 * y[0] + 0.0155 * x[1] + 0.0155 * x[0]; 
 
-      position_balle = y[1];
+      // Filtre passe-bas
+      y[1] = 0.228 * y[0] + 0.85 * x[1] + 0.385 * x[0]; 
+      position_balle = x[1];
       Serial.print(position_balle);
       Serial.print(", ");
 
       x[0] = x[1];
       y[0] = y[1];
-    
+
+      // anti windup
+      if (position_balle < 40 || position_balle > 500) {
+       // erreur_somme = 0;
+      }
+
+
+      // Calcul de la consigne
       erreur = consigne - position_balle;
       Serial.print(erreur);
       Serial.print(", ");
@@ -119,6 +132,7 @@ void loop() {
       float I = KI * erreur_somme;
       float D = KD * erreur_delta;
       
+      
       Serial.print(P);
       Serial.print(", ");
       
@@ -127,7 +141,7 @@ void loop() {
       
       Serial.print(D);
       Serial.print(", ");
-
+      
       position_moteur = P + I + D;
 
       erreur_precedente = erreur;
