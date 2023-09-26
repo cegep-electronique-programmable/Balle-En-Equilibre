@@ -8,13 +8,27 @@
 #define KI 0.01
 #define KD 0.00
 #define DT 0.01
-#define POSITION_CENTRALE 280
+
+uint8_t mode = 0;
+
+float kp = KP;
+float ki = KI;
+float kd = KD;
+float dt = DT;
+
+float P = 0;
+float I = 0;
+float D = 0;
+
+
+#define POSITION_CENTRALE 700
 unsigned long previousMillisControlLoop = 0;
+unsigned long previousMillisDisplayLoop = 0;
 
 // Données de calibration du servo
 #define PIN_SERVO 33
 #define ANGLE_MIN -50
-#define ANGLE_MAX 50
+#define ANGLE_MAX 80
 #define ANGLE_OFFSET 90
 
 Servo myservo;
@@ -62,7 +76,6 @@ void loop() {
   float y[2] = {0, 0}; // filtered position
 
   float consigne = POSITION_CENTRALE;
-  float dt = DT;
   float erreur = 0;
   float erreur_somme = 0;
   float erreur_delta = 0;
@@ -70,6 +83,25 @@ void loop() {
   float position_moteur = 0;
 
   while(1) {
+
+    switch(mode) {
+      case 0:
+        kp = 0.1;
+        ki = 0.05;
+        kd = 0.005;
+        dt = DT;
+        break;
+      
+      case 1: // aller-retours
+        kp = 0.1;
+        ki = 0.01;
+        kd = 0.00;
+        dt = DT;
+        break;
+
+      default:
+        break;
+    }
     
 
     /*
@@ -93,15 +125,12 @@ void loop() {
         x[1] = lox.readRange();
       }
       
-      Serial.print(x[1]);
-      Serial.print(", ");
+      
 
       // Filtre passe-bas
       y[1] = 0.228 * y[0] + 0.85 * x[1] + 0.385 * x[0]; 
-      position_balle = x[1];
-      Serial.print(position_balle);
-      Serial.print(", ");
-
+      position_balle = y[1];
+      
       x[0] = x[1];
       y[0] = y[1];
 
@@ -113,34 +142,29 @@ void loop() {
 
       // Calcul de la consigne
       erreur = consigne - position_balle;
-      Serial.print(erreur);
-      Serial.print(", ");
 
       // anti windup
       if (position_moteur <= ANGLE_MAX && position_moteur >= ANGLE_MIN) {
         erreur_somme = erreur_somme + erreur*dt;
       }
 
+   
+
       erreur_delta = (erreur - erreur_precedente) / dt;
-      /*
-      if (abs(erreur_delta) < 100) {
+
+      if ( (erreur > 0 && erreur_precedente < 0) || (erreur < 0 && erreur_precedente > 0) ) {
+        erreur_somme = 0;
+      }
+      
+      if (abs(erreur_delta) < 2) {
         erreur_delta = 0;
       }
-      */
+      
 
-      float P = KP * erreur;
-      float I = KI * erreur_somme;
-      float D = KD * erreur_delta;
+      P = kp * erreur;
+      I = ki * erreur_somme;
+      D = kd * erreur_delta;
       
-      
-      Serial.print(P);
-      Serial.print(", ");
-      
-      Serial.print(I);
-      Serial.print(", ");
-      
-      Serial.print(D);
-      Serial.print(", ");
       
       position_moteur = P + I + D;
 
@@ -149,9 +173,38 @@ void loop() {
       // Saturation
       position_moteur = position_moteur > ANGLE_MAX ? ANGLE_MAX : position_moteur;
       position_moteur = position_moteur < ANGLE_MIN ? ANGLE_MIN : position_moteur;
-      Serial.println(position_moteur);
+      
 
       moveServo(position_moteur);
+    }
+
+
+    // Boucle de controle de la vitesse horizontale
+    currentMillis = millis();
+     if (currentMillis - previousMillisDisplayLoop >= 100)
+    {
+      previousMillisDisplayLoop = currentMillis;
+
+      Serial.print(x[1]);
+      Serial.print(", ");
+      Serial.print(position_balle);
+      Serial.print(", ");
+      Serial.print(erreur);
+      Serial.print(", ");
+
+      Serial.print(P);
+      Serial.print(", ");
+      
+      Serial.print(I);
+      Serial.print(", ");
+      
+      Serial.print(D);
+      Serial.print(", ");
+
+      Serial.println(position_moteur);
+      
+
+
     }
   } 
     
